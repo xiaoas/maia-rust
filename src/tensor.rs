@@ -3,6 +3,16 @@ use shakmaty::{CastlingMode, Chess, Role, Setup, Square};
 
 use crate::error::MaiaError;
 
+/// Data produced by the preprocessing step, ready for model consumption.
+///
+/// - `board_tensor` has shape `[B, 18, 8, 8]` where `B` is the batch
+///   size.  The 18 channels encode piece locations, turn, castling
+///   rights, and en passant information.
+/// - `mirrored` tracks which positions were horizontally mirrored to
+///   force the model's perspective to always be White.
+/// - `chess_positions` holds the corresponding `Chess` objects after
+///   any mirroring has been applied.  This is needed when converting
+///   the model's output back into human-readable UCI moves.
 pub struct PreprocessedData {
     pub board_tensor: Array4<f32>, // Shape: [B, 18, 8, 8]
     /// maia2 trains on positions from the perspective of white. Black positions are mirrored before being fed into the model.
@@ -11,7 +21,12 @@ pub struct PreprocessedData {
     pub chess_positions: Vec<Chess>,
 }
 
-/// Computes the Elo bucket.
+/// Convert raw ELO ratings to the discrete category indices used by
+/// Maia2 (0..=10).
+///
+/// - Ratings below 1100 map to `0`.
+/// - Ratings 1100–1999 are bucketed in 100‑point increments.
+/// - Ratings 2000 and above map to `10`.
 pub fn map_elos_to_categories(elo: &[u32]) -> Vec<i64> {
     elo.iter()
         .map(|&e| {
@@ -26,6 +41,13 @@ pub fn map_elos_to_categories(elo: &[u32]) -> Vec<i64> {
         .collect()
 }
 
+/// Transform an iterator of `Setup`s into the input tensors
+/// expected by the Maia2 model.
+///
+/// `batch_size` must match the number of setups provided; mismatches
+/// will panic.  This function also records whether each position was
+/// mirrored and returns the possibly‑mirrored `Chess` objects for
+/// later use.
 pub fn preprocess(
     setups: impl IntoIterator<Item = Setup>,
     batch_size: usize,
@@ -39,6 +61,9 @@ pub fn preprocess(
         if i >= batch_size {
             panic!("More setups provided than batch size");
         }
+        // If it's Black's turn we flip the board so the network always
+        // sees White to move.  We remember this so that outputs can be
+        // mirrored back later.
         let mirrored = setup.turn.is_black();
         mirrored_vec.push(mirrored);
 
@@ -68,7 +93,8 @@ pub fn preprocess(
 }
 
 fn board_to_tensor(setup: &Setup, mut tensor: ArrayViewMut3<f32>) {
-    // 1. Piece Placement (Channels 0..11)
+    // 1. Piece placement occupies channels 0..11.  We encode white pieces
+    // in 0..5 and black pieces in 6..11.
     for sq in Square::ALL {
         if let Some(piece) = setup.board.piece_at(sq) {
             let color_offset = if piece.color.is_white() { 0 } else { 6 };
@@ -86,13 +112,13 @@ fn board_to_tensor(setup: &Setup, mut tensor: ArrayViewMut3<f32>) {
         }
     }
 
-    // 2. Player's turn (Channel 12)
+    // 2. Player's turn (channel 12): set all squares to 1 if white to move.
     tensor
         .index_axis_mut(Axis(0), 12)
         .fill(setup.turn.is_white() as u8 as f32); // 1.0 if is_white else 0.0
 
-    // 3. Castling rights (Channels 13..16)
-    // Bitboard efficiently tracks the original rook squares for standard castling mappings
+    // 3. Castling rights (channels 13..16) indicate the original rook
+    // squares; presence signals permission to castle.
     let castling_rights = [
         setup.castling_rights.contains(Square::H1), // K
         setup.castling_rights.contains(Square::A1), // Q
@@ -105,7 +131,7 @@ fn board_to_tensor(setup: &Setup, mut tensor: ArrayViewMut3<f32>) {
             .fill(has_right as u8 as f32); // 1.0 if has_right else 0.0
     }
 
-    // 4. En passant target (Channel 17)
+    // 4. En passant target (channel 17) is a one‑hot square if present.
     if let Some(ep_sq) = setup.ep_square {
         tensor[[17, ep_sq.rank() as usize, ep_sq.file() as usize]] = 1.0;
     }

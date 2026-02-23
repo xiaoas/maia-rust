@@ -9,25 +9,50 @@ use crate::{
     types::{EvaluationResult, MoveProbability},
 };
 
+/// Wrapper around an ONNX Runtime session configured with the
+/// Maia2 model.
+///
+/// The struct manages an inference session and exposes evaluation
+/// functions that accept FEN strings or `shakmaty` setups.  The
+/// model expects inputs in a specific tensor layout; helper functions
+/// in the `tensor` module handle the conversion.
 pub struct Maia {
     session: Session,
 }
 
 impl Maia {
-    /// Initialize from a local `.onnx` file path
+    /// Create a Maia instance by loading a model from a `.onnx` file.
+    ///
+    /// # Errors
+    /// Returns a [`MaiaError::OrtError`] if the session cannot be
+    /// constructed or the file cannot be read.
     pub fn from_file(path: &str) -> Result<Self, MaiaError> {
         let session = Session::builder()?.commit_from_file(path)?;
 
         Ok(Self { session })
     }
 
-    /// Initialize from raw bytes
+    /// Construct from raw ONNX model bytes, useful for embedding the
+    /// model in the binary or loading from a network source.
+    ///
+    /// # Errors
+    /// Similar to [`from_file`], errors are propagated as
+    /// [`MaiaError::OrtError`].
     pub fn from_memory(model_bytes: &[u8]) -> Result<Self, MaiaError> {
         let session = Session::builder()?.commit_from_memory(model_bytes)?;
 
         Ok(Self { session })
     }
 
+    /// Evaluate a single position specified by FEN.
+    ///
+    /// ELO values for both sides are provided to condition the network.
+    /// They will be bucketed according to the rules described in
+    /// [`batch_evaluate`].
+    ///
+    /// # Errors
+    /// - Returns [`MaiaError::InvalidFen`] if the FEN cannot be parsed.
+    /// - Propagates any errors from batched evaluation.
     pub fn evaluate(
         &mut self,
         fen: &str,
@@ -40,8 +65,20 @@ impl Maia {
         let results = self.batch_evaluate([setup], &[elo_self], &[elo_oppo])?;
         Ok(results.into_iter().next().unwrap())
     }
-    /// the slices should all have the same length, representing the batch size.
-    /// Maia2 supports elo buckets from 10xx to 20xx in 100-point increments. Values will be clamped to the nearest bucket (e.g., 900 -> 1000 bucket, 1170 -> 1100 bucket, 2050 -> 2000 bucket).
+    /// Evaluate a batch of positions simultaneously.
+    ///
+    /// The iterator of [`Setup`]s supplies the board states; the slices of
+    /// `elo_selfs` and `elo_oppos` must have identical length equal to the
+    /// number of setups.  Batch evaluation is significantly faster than
+    /// calling [`evaluate`] repeatedly when performing multiple inferences.
+    ///
+    /// **Elo bucketing:** Maia2 supports buckets from 1100 to 2000 in
+    /// 100‑point increments.  Supplied elo values are clamped to the
+    /// nearest bucket, e.g. `900` becomes `1100`, `1170` becomes
+    /// `1100`, and `2050` becomes `2000`.
+    ///
+    /// # Errors
+    /// See [`MaiaError`] for possible failure modes.
     pub fn batch_evaluate(
         &mut self,
         setups: impl IntoIterator<Item = Setup>,
@@ -57,7 +94,8 @@ impl Maia {
         // 2. Convert source to inputs
         let elo_selfs = map_elos_to_categories(elo_selfs);
         let elo_oppos = map_elos_to_categories(elo_oppos);
-        // 3. Run Inference
+        // 3. Run inference on the prepared tensors.
+        //    The `ort::inputs!` macro conveniently builds an input map.
         let outputs = self.session.run(ort::inputs! {
                 "boards" => Tensor::from_array(data.board_tensor)?,
                 "elo_self" => Tensor::from_array(([batch_size], elo_selfs))?,
@@ -94,6 +132,14 @@ impl Maia {
         Ok(results)
     }
 
+    /// Convert raw model outputs to a structured [`EvaluationResult`].
+    ///
+    /// `logits_maia` contains unnormalized policy logits for all moves in
+    /// the fixed vocabulary.  `raw_value` is a single scalar which is
+    /// translated into a win probability.  `mirrored` indicates whether
+    /// the input position was reflected so that the model always sees
+    /// White to move; if true the computed win probability is inverted
+    /// and legal moves are mirrored back.
     fn process_output(
         logits_maia: ArrayView1<f32>,
         raw_value: f32,
@@ -121,17 +167,21 @@ impl Maia {
         //     move_data.push((actual_uci, logit));
         // }
         for m in &legal_moves {
-            // Get the actual legal move in UciMove format
+            // Convert the `shakmaty` move into the UCI notation the model
+            // expects.
             let uci = m.to_uci(shakmaty::CastlingMode::Standard);
 
-            // If the board was mirrored (Black's turn), use the mirrored UCI in response
+            // If input was mirrored (because it was Black's turn), we
+            // must mirror the move back when reporting results.
             let actual_uci = if mirrored {
                 uci.to_mirrored()
             } else {
                 uci
             };
 
-            // Retrieve logit for the move according to the model's perspective
+            // Look up the move's index in the fixed vocabulary.  Some
+            // theoretically legal moves may not appear in the training set,
+            // so we ignore those.
             if let Some(&idx) = ALL_MOVES.get(&uci) {
                 let logit = logits_maia[idx];
 
@@ -139,7 +189,6 @@ impl Maia {
                     max_logit = logit;
                 }
 
-                // Track the actual unmirrored UciMove paired with its logit
                 move_data.push((actual_uci, logit));
             }
         }
