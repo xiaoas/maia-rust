@@ -1,8 +1,5 @@
 use ndarray::{ArrayView1, Axis};
-use ort::{
-    session::Session,
-    value::Tensor,
-};
+use ort::{session::Session, value::Tensor};
 use shakmaty::{Chess, Position, Setup};
 
 use crate::{
@@ -75,15 +72,15 @@ impl Maia {
 
         let logits_value = outputs["logits_value"]
             .try_extract_array::<f32>()?
-            .into_dimensionality::<ndarray::Ix2>()
-            .unwrap(); // logits_value should be 2D
+            .into_dimensionality::<ndarray::Ix1>()
+            .unwrap();
 
         // 5. Postprocess into EvaluationResults
         let mut results = Vec::with_capacity(batch_size);
 
         for i in 0..batch_size {
             let logits_for_item = logits_maia.index_axis(Axis(0), i);
-            let raw_value = logits_value[[i, 0]];
+            let raw_value = logits_value[[i]];
 
             let result = Self::process_output(
                 logits_for_item,
@@ -114,19 +111,28 @@ impl Maia {
         let mut max_logit = f32::NEG_INFINITY;
         let mut move_data = Vec::with_capacity(legal_moves.len());
 
+        // for (uci, &idx) in &*ALL_MOVES {
+        //     let actual_uci = if mirrored { uci.to_mirrored() } else { *uci };
+        //     let logit = logits_maia[idx];
+
+        //     if logit > max_logit {
+        //         max_logit = logit;
+        //     }
+        //     move_data.push((actual_uci, logit));
+        // }
         for m in &legal_moves {
             // Get the actual legal move in UciMove format
-            let actual_uci = m.to_uci(shakmaty::CastlingMode::Standard);
+            let uci = m.to_uci(shakmaty::CastlingMode::Standard);
 
-            // If the board was mirrored (Black's turn), the model predicts the mirrored move
-            let model_uci = if mirrored {
-                actual_uci.to_mirrored()
+            // If the board was mirrored (Black's turn), use the mirrored UCI in response
+            let actual_uci = if mirrored {
+                uci.to_mirrored()
             } else {
-                actual_uci
+                uci
             };
 
             // Retrieve logit for the move according to the model's perspective
-            if let Some(&idx) = ALL_MOVES.get(&model_uci) {
+            if let Some(&idx) = ALL_MOVES.get(&uci) {
                 let logit = logits_maia[idx];
 
                 if logit > max_logit {

@@ -5,9 +5,10 @@ use crate::error::MaiaError;
 
 pub struct PreprocessedData {
     pub board_tensor: Array4<f32>, // Shape: [B, 18, 8, 8]
-    pub chess_positions: Vec<Chess>,
     /// maia2 trains on positions from the perspective of white. Black positions are mirrored before being fed into the model.
     pub mirrored: Vec<bool>,
+    /// potentially mirrored chess positions. 
+    pub chess_positions: Vec<Chess>,
 }
 
 /// Computes the Elo bucket.
@@ -107,5 +108,36 @@ fn board_to_tensor(setup: &Setup, mut tensor: ArrayViewMut3<f32>) {
     // 4. En passant target (Channel 17)
     if let Some(ep_sq) = setup.ep_square {
         tensor[[17, ep_sq.rank() as usize, ep_sq.file() as usize]] = 1.0;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shakmaty::fen::Fen;
+
+    #[test]
+    fn verify_tensor_output() {
+        // Position: Start of Sicilian Defense (1. e4 c5)
+        let fen_str = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+        let setup: Setup = fen_str.parse::<Fen>().unwrap().into_setup();
+
+        // Process a single item
+        let data = preprocess(vec![setup], 1).unwrap();
+        let tensor = data.board_tensor;
+
+        println!("Rust Tensor Non-Zero Indices:");
+        // Iterate over the single batch item (index 0)
+        for c in 0..18 {
+            for h in 0..8 {
+                for w in 0..8 {
+                    // Access: [batch, channel, rank, file]
+                    if tensor[[0, c, h, w]] != 0.0 {
+                         // c: channel, h: rank (0 is rank 1), w: file (0 is a)
+                        println!("[{}, {}, {}]", c, h, w);
+                    }
+                }
+            }
+        }
     }
 }

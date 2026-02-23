@@ -10,6 +10,4 @@ pub enum MaiaError {
     InvalidPosition(#[from] shakmaty::PositionError<shakmaty::Chess>),
     #[error("Tensor shape error: {0}")]
     ShapeError(#[from] ndarray::ShapeError),
-    #[error("Model not initialized")]
-    Uninitialized,
 }
