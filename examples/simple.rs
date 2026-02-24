@@ -3,7 +3,7 @@ use std::fs;
 use std::io::copy;
 use std::path::Path;
 
-const MODEL_URL: &str = "https://github.com/CSSLab/maia-platform-frontend/raw/c2afee/public/maia2/maia_rapid.onnx";
+const MODEL_URL: &str = "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx";
 const MODEL_PATH: &str = "maia_rapid.onnx";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,13 +22,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing Maia session...");
     let mut maia = Maia::from_file(MODEL_PATH)?;
 
-    // 3. Define the position (Standard Start Position)
+    // 3. Define the position
     let start_fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
     
     // 4. Run Evaluation
     // We simulate a game between two 1500 Elo players
     println!("Evaluating starting position for 1500 vs 1500...");
-    let result = maia.evaluate(start_fen, 1500, 1500)?;
+    let result = maia.evaluate_fen(start_fen, 1500, 1500)?;
 
     // 5. Output Results
     println!("------------------------------------------------");

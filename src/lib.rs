@@ -21,7 +21,7 @@ mod tensor;
 mod types;
 
 /// Main model wrapper.
-pub use maia::Maia;
+pub use maia::{Maia, MaiaElo, MAIA_ELOS};
 
 /// Error type produced by library operations.
 pub use error::MaiaError;

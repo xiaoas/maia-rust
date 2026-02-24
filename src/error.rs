@@ -19,10 +19,16 @@ pub enum MaiaError {
 
     /// A parsed position is invalid from the perspective of `shakmaty`.
     #[error("Invalid Chess Position: {0}")]
-    InvalidPosition(#[from] shakmaty::PositionError<shakmaty::Chess>),
+    InvalidPosition(Box<shakmaty::PositionError<shakmaty::Chess>>),
 
     /// Occurs when an ndarray has an unexpected shape during tensor
     /// preparation or extraction.
     #[error("Tensor shape error: {0}")]
     ShapeError(#[from] ndarray::ShapeError),
+}
+
+impl From<shakmaty::PositionError<shakmaty::Chess>> for MaiaError {
+    fn from(err: shakmaty::PositionError<shakmaty::Chess>) -> Self {
+        MaiaError::InvalidPosition(Box::new(err))
+    }
 }

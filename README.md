@@ -26,7 +26,7 @@ fn main() -> Result<(), maia_rust::MaiaError> {
     let mut maia = Maia::from_file("maia_rapid.onnx")?;
 
     // evaluate a position by FEN
-    let eval = maia.evaluate(
+    let eval = maia.evaluate_fen(
         "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
         1200, // self elo
         1500, // opponent elo

@@ -44,6 +44,11 @@ impl Maia {
         Ok(Self { session })
     }
 
+    /// Construct from an existing ONNX Runtime session that's running maia2, allowing users to
+    /// configure the session themselves.
+    pub fn from_session(session: Session) -> Self {
+        Self { session }
+    }
     /// Evaluate a single position specified by FEN.
     ///
     /// ELO values for both sides are provided to condition the network.
@@ -53,7 +58,7 @@ impl Maia {
     /// # Errors
     /// - Returns [`MaiaError::InvalidFen`] if the FEN cannot be parsed.
     /// - Propagates any errors from batched evaluation.
-    pub fn evaluate(
+    pub fn evaluate_fen(
         &mut self,
         fen: &str,
         elo_self: u32,
@@ -171,17 +176,7 @@ impl Maia {
             // expects.
             let uci = m.to_uci(shakmaty::CastlingMode::Standard);
 
-            // If input was mirrored (because it was Black's turn), we
-            // must mirror the move back when reporting results.
-            let actual_uci = if mirrored {
-                uci.to_mirrored()
-            } else {
-                uci
-            };
-
-            // Look up the move's index in the fixed vocabulary.  Some
-            // theoretically legal moves may not appear in the training set,
-            // so we ignore those.
+            // Look up the move's index in the fixed vocabulary.
             if let Some(&idx) = ALL_MOVES.get(&uci) {
                 let logit = logits_maia[idx];
 
@@ -189,6 +184,9 @@ impl Maia {
                     max_logit = logit;
                 }
 
+                // If input was mirrored (because it was Black's turn), we
+                // must mirror the move back when reporting results.
+                let actual_uci = if mirrored { uci.to_mirrored() } else { uci };
                 move_data.push((actual_uci, logit));
             }
         }
@@ -221,3 +219,34 @@ impl Maia {
         }
     }
 }
+
+/// Supported ELos of maia2 that will get mapped to different categories.
+/// 
+/// EloLow maps to games with <= 1100 Elo, while eloHigh maps to games with >= 2000 Elo. Other ones denote the lower bound.
+pub enum MaiaElo {
+    EloLow = 1000,
+    Elo1100 = 1100,
+    Elo1200 = 1200,
+    Elo1300 = 1300,
+    Elo1400 = 1400,
+    Elo1500 = 1500,
+    Elo1600 = 1600,
+    Elo1700 = 1700,
+    Elo1800 = 1800,
+    Elo1900 = 1900,
+    EloHigh = 2000,
+}
+
+pub const MAIA_ELOS: [u32; 11] = [
+    MaiaElo::EloLow as _,
+    MaiaElo::Elo1100 as _,
+    MaiaElo::Elo1200 as _,
+    MaiaElo::Elo1300 as _,
+    MaiaElo::Elo1400 as _,
+    MaiaElo::Elo1500 as _,
+    MaiaElo::Elo1600 as _,
+    MaiaElo::Elo1700 as _,
+    MaiaElo::Elo1800 as _,
+    MaiaElo::Elo1900 as _,
+    MaiaElo::EloHigh as _,
+];
