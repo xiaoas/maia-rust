@@ -1,6 +1,7 @@
 use std::{fs, io::copy, path::Path};
 
 use maia_rust::Maia;
+use ort::session::Session;
 
 const MODEL_URL: &str = "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx";
 const MODEL_PATH: &str = "maia_rapid.onnx";

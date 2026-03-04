@@ -8,7 +8,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum MaiaError {
+pub enum Error {
     /// Wraps an error returned by the underlying ONNX Runtime bindings.
     #[error("ONNX Runtime error: {0}")]
     OrtError(#[from] ort::Error),
@@ -27,8 +27,8 @@ pub enum MaiaError {
     ShapeError(#[from] ndarray::ShapeError),
 }
 
-impl From<shakmaty::PositionError<shakmaty::Chess>> for MaiaError {
+impl From<shakmaty::PositionError<shakmaty::Chess>> for Error {
     fn from(err: shakmaty::PositionError<shakmaty::Chess>) -> Self {
-        MaiaError::InvalidPosition(Box::new(err))
+        Error::InvalidPosition(Box::new(err))
     }
 }

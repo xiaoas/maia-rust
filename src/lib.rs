@@ -21,7 +21,7 @@ mod tensor;
 mod types;
 
 /// Error type produced by library operations.
-pub use error::MaiaError;
+pub use error::Error;
 /// Main model wrapper.
 pub use maia::{MAIA_ELOS, Maia, MaiaElo};
 /// Re-export of `shakmaty` for convenience when building positions.

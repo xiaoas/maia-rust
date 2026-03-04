@@ -1,9 +1,11 @@
+use std::path::Path;
+
 use ndarray::{ArrayView1, Axis};
 use ort::{session::Session, value::Tensor};
 use shakmaty::{Chess, Position, Setup};
 
 use crate::{
-    error::MaiaError,
+    error::Error,
     moves::ALL_MOVES,
     tensor::{map_elos_to_categories, preprocess},
     types::{EvaluationResult, MoveProbability},
@@ -26,7 +28,7 @@ impl Maia {
     /// # Errors
     /// Returns a [`MaiaError::OrtError`] if the session cannot be
     /// constructed or the file cannot be read.
-    pub fn from_file(path: &str) -> Result<Self, MaiaError> {
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, Error> {
         let session = Session::builder()?.commit_from_file(path)?;
 
         Ok(Self { session })
@@ -38,7 +40,7 @@ impl Maia {
     /// # Errors
     /// Similar to [`from_file`], errors are propagated as
     /// [`MaiaError::OrtError`].
-    pub fn from_memory(model_bytes: &[u8]) -> Result<Self, MaiaError> {
+    pub fn from_memory(model_bytes: &[u8]) -> Result<Self, Error> {
         let session = Session::builder()?.commit_from_memory(model_bytes)?;
 
         Ok(Self { session })
@@ -63,7 +65,7 @@ impl Maia {
         fen: &str,
         elo_self: u32,
         elo_oppo: u32,
-    ) -> Result<EvaluationResult, MaiaError> {
+    ) -> Result<EvaluationResult, Error> {
         let fen: shakmaty::fen::Fen = fen.parse()?;
         let setup: Setup = fen.into();
 
@@ -89,7 +91,7 @@ impl Maia {
         setups: impl IntoIterator<Item = Setup>,
         elo_selfs: &[u32],
         elo_oppos: &[u32],
-    ) -> Result<Vec<EvaluationResult>, MaiaError> {
+    ) -> Result<Vec<EvaluationResult>, Error> {
         let batch_size = elo_selfs.len();
         assert_eq!(elo_oppos.len(), batch_size);
 
@@ -122,7 +124,7 @@ impl Maia {
         elo_selfs: &[u32],
         elo_oppos: &[u32],
         options: &ort::session::RunOptions,
-    ) -> Result<Vec<EvaluationResult>, MaiaError> {
+    ) -> Result<Vec<EvaluationResult>, Error> {
         let batch_size = elo_selfs.len();
         assert_eq!(elo_oppos.len(), batch_size);
 
@@ -161,7 +163,7 @@ impl Maia {
         elo_selfs: &[u32],
         elo_oppos: &[u32],
         options: &ort::session::RunOptions,
-    ) -> Result<Vec<EvaluationResult>, MaiaError> {
+    ) -> Result<Vec<EvaluationResult>, Error> {
         let batch_size = elo_selfs.len();
         assert_eq!(elo_oppos.len(), batch_size);
 
@@ -194,7 +196,7 @@ impl Maia {
         outputs: ort::session::SessionOutputs,
         batch_size: usize,
         data: crate::tensor::PreprocessedData,
-    ) -> Result<Vec<EvaluationResult>, MaiaError> {
+    ) -> Result<Vec<EvaluationResult>, Error> {
         // 4. Extract Logits
         let logits_maia = outputs["logits_maia"]
             .try_extract_array::<f32>()?

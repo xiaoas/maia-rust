@@ -1,7 +1,7 @@
 use ndarray::{Array4, ArrayViewMut3, Axis};
 use shakmaty::{CastlingMode, Chess, Role, Setup, Square};
 
-use crate::error::MaiaError;
+use crate::error::Error;
 
 /// Data produced by the preprocessing step, ready for model consumption.
 ///
@@ -50,7 +50,7 @@ pub fn map_elos_to_categories(elo: &[u32]) -> Vec<i64> {
 pub fn preprocess(
     setups: impl IntoIterator<Item = Setup>,
     batch_size: usize,
-) -> Result<(Array4<f32>, PreprocessedData), MaiaError> {
+) -> Result<(Array4<f32>, PreprocessedData), Error> {
     let mut board_tensor = Array4::<f32>::zeros((batch_size, 18, 8, 8));
     let mut mirrored_vec = Vec::with_capacity(batch_size);
     let mut chess_positions = Vec::with_capacity(batch_size);
