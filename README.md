@@ -40,15 +40,30 @@ fn main() -> Result<(), maia_rust::MaiaError> {
 
 Batched inference is supported via [`Maia::batch_evaluate`], which
 accepts an iterator of `shakmaty::Setup` and parallel slices of ELO
-ratings.
+ratings.  There are also convenience variants that use an async ORT
+call or allow custom runtime options:
 
 ```rust
 use shakmaty::fen::Fen;
 let setups = vec![
-    Fen::from_str("..."?)?.into_setup(),
+    Fen::from_str("...")?.into_setup(),
     // more setups...
 ];
-let results = maia.batch_evaluate(setups, &[1200, 1800], &[1600, 1400])?;
+
+// synchronous batch evaluation
+let results = maia.batch_evaluate(setups.clone(), &[1200, 1800], &[1600, 1400])?;
+
+// asynchronous version (requires an async runtime)
+let results_async = tokio::runtime::Runtime::new()
+    .unwrap()
+    .block_on(maia.batch_evaluate_async(setups.clone(), &[1200, 1800], &[1600, 1400]))?;
+
+// supply custom ORT options
+let mut opts = ort::session::RunOptions::new();
+opts.set_log_level(LogLevel::Warning).unwrap();
+let results_opts = maia.batch_evaluate_with_options(
+    setups, &[1200, 1800], &[1600, 1400], &opts,
+)?;
 ```
 
 ## License

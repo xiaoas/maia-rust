@@ -20,14 +20,11 @@ mod moves;
 mod tensor;
 mod types;
 
-/// Main model wrapper.
-pub use maia::{Maia, MaiaElo, MAIA_ELOS};
-
 /// Error type produced by library operations.
 pub use error::MaiaError;
-
-/// Output data structures returned by evaluations.
-pub use types::{EvaluationResult, MoveProbability};
-
+/// Main model wrapper.
+pub use maia::{MAIA_ELOS, Maia, MaiaElo};
 /// Re-export of `shakmaty` for convenience when building positions.
 pub use shakmaty;
+/// Output data structures returned by evaluations.
+pub use types::{EvaluationResult, MoveProbability};

@@ -94,19 +94,107 @@ impl Maia {
         assert_eq!(elo_oppos.len(), batch_size);
 
         // 1. Preprocess
-        let data = preprocess(setups, batch_size)?;
+        let (board, data) = preprocess(setups, batch_size)?;
 
         // 2. Convert source to inputs
         let elo_selfs = map_elos_to_categories(elo_selfs);
         let elo_oppos = map_elos_to_categories(elo_oppos);
-        // 3. Run inference on the prepared tensors.
-        //    The `ort::inputs!` macro conveniently builds an input map.
+
+        // 3. Run inference and postprocess
         let outputs = self.session.run(ort::inputs! {
-                "boards" => Tensor::from_array(data.board_tensor)?,
+                "boards" => Tensor::from_array(board)?,
                 "elo_self" => Tensor::from_array(([batch_size], elo_selfs))?,
                 "elo_oppo" => Tensor::from_array(([batch_size], elo_oppos))?,
         })?;
 
+        Self::finalize_batch(outputs, batch_size, data)
+    }
+
+    /// Asynchronous version of [`batch_evaluate`].
+    ///
+    /// This function behaves identically to `batch_evaluate`, except that
+    /// it uses [`Session::run_async`] internally and therefore returns a
+    /// future that must be `.await`ed.  It is useful when the caller is
+    /// already running inside an async runtime and wants to avoid blocking.
+    pub async fn batch_evaluate_async(
+        &mut self,
+        setups: impl IntoIterator<Item = Setup>,
+        elo_selfs: &[u32],
+        elo_oppos: &[u32],
+        options: &ort::session::RunOptions,
+    ) -> Result<Vec<EvaluationResult>, MaiaError> {
+        let batch_size = elo_selfs.len();
+        assert_eq!(elo_oppos.len(), batch_size);
+
+        // 1. Preprocess
+        let (board, data) = preprocess(setups, batch_size)?;
+
+        // 2. Convert source to inputs
+        let elo_selfs = map_elos_to_categories(elo_selfs);
+        let elo_oppos = map_elos_to_categories(elo_oppos);
+
+        // 3. Run inference asynchronously and postprocess
+        let outputs = self
+            .session
+            .run_async(
+                ort::inputs! {
+                    "boards" => Tensor::from_array(board)?,
+                    "elo_self" => Tensor::from_array(([batch_size], elo_selfs))?,
+                    "elo_oppo" => Tensor::from_array(([batch_size], elo_oppos))?,
+                },
+                &options,
+            )?
+            .await?;
+
+        Self::finalize_batch(outputs, batch_size, data)
+    }
+
+    /// Batch evaluation that allows callers to supply custom `RunOptions`.
+    ///
+    /// The provided [`ort::session::RunOptions`] are forwarded directly to
+    /// [`Session::run_with_options`].  This is handy when the user wants to
+    /// adjust logging, threading, or profiling behaviour on a per-inference
+    /// basis.
+    pub fn batch_evaluate_with_options(
+        &mut self,
+        setups: impl IntoIterator<Item = Setup>,
+        elo_selfs: &[u32],
+        elo_oppos: &[u32],
+        options: &ort::session::RunOptions,
+    ) -> Result<Vec<EvaluationResult>, MaiaError> {
+        let batch_size = elo_selfs.len();
+        assert_eq!(elo_oppos.len(), batch_size);
+
+        // 1. Preprocess
+        let (board, data) = preprocess(setups, batch_size)?;
+
+        // 2. Convert source to inputs
+        let elo_selfs = map_elos_to_categories(elo_selfs);
+        let elo_oppos = map_elos_to_categories(elo_oppos);
+
+        // 3. Run inference with options and postprocess
+        let outputs = self.session.run_with_options(
+            ort::inputs! {
+                "boards" => Tensor::from_array(board)?,
+                "elo_self" => Tensor::from_array(([batch_size], elo_selfs))?,
+                "elo_oppo" => Tensor::from_array(([batch_size], elo_oppos))?,
+            },
+            options,
+        )?;
+
+        Self::finalize_batch(outputs, batch_size, data)
+    }
+
+    /// Internal helper used by the various batch evaluation entrypoints.
+    ///
+    /// Takes ownership of the preprocessed data so that we can consume it
+    /// without having to duplicate the logic in `batch_evaluate`,
+    /// `batch_evaluate_async` and `batch_evaluate_with_options`.
+    fn finalize_batch(
+        outputs: ort::session::SessionOutputs,
+        batch_size: usize,
+        data: crate::tensor::PreprocessedData,
+    ) -> Result<Vec<EvaluationResult>, MaiaError> {
         // 4. Extract Logits
         let logits_maia = outputs["logits_maia"]
             .try_extract_array::<f32>()?
@@ -221,8 +309,8 @@ impl Maia {
 }
 
 /// Supported ELos of maia2 that will get mapped to different categories.
-/// 
-/// EloLow maps to games with <= 1100 Elo, while eloHigh maps to games with >= 2000 Elo. Other ones denote the lower bound.
+///
+/// EloLow maps to games with < 1100 Elo, while eloHigh maps to games with >= 2000 Elo. Other ones denote the lower bound.
 pub enum MaiaElo {
     EloLow = 1000,
     Elo1100 = 1100,
@@ -250,3 +338,49 @@ pub const MAIA_ELOS: [u32; 11] = [
     MaiaElo::Elo1900 as _,
     MaiaElo::EloHigh as _,
 ];
+
+#[cfg(test)]
+mod tests {
+    use ort::logging::LogLevel;
+    use shakmaty::fen::Fen;
+
+    use super::*;
+
+    fn sample_setup() -> Setup {
+        let fen: Fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2"
+            .parse()
+            .unwrap();
+        fen.into()
+    }
+
+    #[test]
+    fn sync_and_options_evaluate() {
+        let mut maia = Maia::from_file("maia_rapid.onnx").expect("load model");
+        let setups = vec![sample_setup()];
+
+        let r1 = maia
+            .batch_evaluate(setups.clone(), &[1500], &[1500])
+            .expect("sync eval");
+        assert_eq!(r1.len(), 1);
+
+        let mut opts = ort::session::RunOptions::new().unwrap();
+        opts.set_log_level(LogLevel::Warning).unwrap();
+        let r2 = maia
+            .batch_evaluate_with_options(setups, &[1500], &[1500], &opts)
+            .expect("options eval");
+        assert_eq!(r2.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn async_evaluate() {
+        let mut maia = Maia::from_file("maia_rapid.onnx").expect("load model");
+        let setups = vec![sample_setup()];
+
+        let opts = ort::session::RunOptions::new().unwrap();
+        let r = maia
+            .batch_evaluate_async(setups, &[1500], &[1500], &opts)
+            .await
+            .expect("async eval");
+        assert_eq!(r.len(), 1);
+    }
+}

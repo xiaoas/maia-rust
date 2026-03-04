@@ -5,19 +5,15 @@ use crate::error::MaiaError;
 
 /// Data produced by the preprocessing step, ready for model consumption.
 ///
-/// - `board_tensor` has shape `[B, 18, 8, 8]` where `B` is the batch
-///   size.  The 18 channels encode piece locations, turn, castling
-///   rights, and en passant information.
 /// - `mirrored` tracks which positions were horizontally mirrored to
 ///   force the model's perspective to always be White.
 /// - `chess_positions` holds the corresponding `Chess` objects after
 ///   any mirroring has been applied.  This is needed when converting
 ///   the model's output back into human-readable UCI moves.
 pub struct PreprocessedData {
-    pub board_tensor: Array4<f32>, // Shape: [B, 18, 8, 8]
     /// maia2 trains on positions from the perspective of white. Black positions are mirrored before being fed into the model.
     pub mirrored: Vec<bool>,
-    /// potentially mirrored chess positions. 
+    /// potentially mirrored chess positions.
     pub chess_positions: Vec<Chess>,
 }
 
@@ -48,10 +44,13 @@ pub fn map_elos_to_categories(elo: &[u32]) -> Vec<i64> {
 /// will panic.  This function also records whether each position was
 /// mirrored and returns the possibly‑mirrored `Chess` objects for
 /// later use.
+/// `board_tensor` has shape `[B, 18, 8, 8]` where `B` is the batch
+///   size.  The 18 channels encode piece locations, turn, castling
+///   rights, and en passant information.
 pub fn preprocess(
     setups: impl IntoIterator<Item = Setup>,
     batch_size: usize,
-) -> Result<PreprocessedData, MaiaError> {
+) -> Result<(Array4<f32>, PreprocessedData), MaiaError> {
     let mut board_tensor = Array4::<f32>::zeros((batch_size, 18, 8, 8));
     let mut mirrored_vec = Vec::with_capacity(batch_size);
     let mut chess_positions = Vec::with_capacity(batch_size);
@@ -85,11 +84,13 @@ pub fn preprocess(
     //     })
     //     .collect();
 
-    Ok(PreprocessedData {
+    Ok((
         board_tensor,
-        chess_positions,
-        mirrored: mirrored_vec,
-    })
+        PreprocessedData {
+            chess_positions,
+            mirrored: mirrored_vec,
+        },
+    ))
 }
 
 fn board_to_tensor(setup: &Setup, mut tensor: ArrayViewMut3<f32>) {
@@ -139,8 +140,9 @@ fn board_to_tensor(setup: &Setup, mut tensor: ArrayViewMut3<f32>) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use shakmaty::fen::Fen;
+
+    use super::*;
 
     #[test]
     fn verify_tensor_output() {
@@ -149,8 +151,7 @@ mod tests {
         let setup: Setup = fen_str.parse::<Fen>().unwrap().into_setup();
 
         // Process a single item
-        let data = preprocess(vec![setup], 1).unwrap();
-        let tensor = data.board_tensor;
+        let (tensor, _) = preprocess(vec![setup], 1).unwrap();
 
         println!("Rust Tensor Non-Zero Indices:");
         // Iterate over the single batch item (index 0)
@@ -159,7 +160,7 @@ mod tests {
                 for w in 0..8 {
                     // Access: [batch, channel, rank, file]
                     if tensor[[0, c, h, w]] != 0.0 {
-                         // c: channel, h: rank (0 is rank 1), w: file (0 is a)
+                        // c: channel, h: rank (0 is rank 1), w: file (0 is a)
                         println!("[{}, {}, {}]", c, h, w);
                     }
                 }

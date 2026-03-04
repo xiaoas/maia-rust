@@ -1,7 +1,6 @@
+use std::{fs, io::copy, path::Path};
+
 use maia_rust::Maia;
-use std::fs;
-use std::io::copy;
-use std::path::Path;
 
 const MODEL_URL: &str = "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx";
 const MODEL_PATH: &str = "maia_rapid.onnx";
@@ -24,23 +23,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Define the position
     let start_fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
-    
+
     // 4. Run Evaluation
     // We simulate a game between two 1500 Elo players
     println!("Evaluating starting position for 1500 vs 1500...");
     let result = maia.evaluate_fen(start_fen, 1500, 1500)?;
 
+    // (If you prefer batched inference, the crate also exposes
+    // `batch_evaluate`, an async variant `batch_evaluate_async`, and a
+    // version that accepts `RunOptions`.)
+    //
+    // Example (synchronous):
+    // let setups = vec![start_fen.parse::<shakmaty::fen::Fen>()?.into()];
+    // let batch_results = maia.batch_evaluate(setups, &[1500], &[1500])?;
+
     // 5. Output Results
     println!("------------------------------------------------");
-    println!("Win Probability (Side to move): {:.2}%", result.value * 100.0);
+    println!(
+        "Win Probability (Side to move): {:.2}%",
+        result.value * 100.0
+    );
     println!("------------------------------------------------");
     println!("Top 5 Predicted Moves:");
-    
+
     for (i, move_prob) in result.policy.iter().take(5).enumerate() {
         println!(
-            "{}. {}  (Prob: {:.2}%)", 
-            i + 1, 
-            move_prob.uci, 
+            "{}. {}  (Prob: {:.2}%)",
+            i + 1,
+            move_prob.uci,
             move_prob.probability * 100.0
         );
     }
@@ -51,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Helper to download file using reqwest (blocking)
 fn download_model(url: &str, path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut response = reqwest::blocking::get(url)?;
-    
+
     if !response.status().is_success() {
         return Err(format!("Failed to download: {}", response.status()).into());
     }

@@ -14,3 +14,5 @@ thiserror = "2.0.18"
 
 [dev-dependencies]
 reqwest = "0.13.2"
+# tokio is only required for async tests demonstrating `batch_evaluate_async`
+tokio = { version = "1.0", features = ["macros", "rt"] }
