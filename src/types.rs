@@ -2,6 +2,7 @@ use shakmaty::uci::UciMove;
 
 /// A move paired with the model's estimated probability of being the
 /// best choice.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct MoveProbability {
     /// Move in UCI notation.
@@ -12,6 +13,7 @@ pub struct MoveProbability {
 }
 
 /// Output returned by the Maia evaluator.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct EvaluationResult {
     /// Policy head results: legal moves sorted by descending

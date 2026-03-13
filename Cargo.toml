@@ -1,7 +1,11 @@
 [package]
 name = "maia-rust"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
+
+[features]
+default = ["serde"]
+serde = ["shakmaty/serde"]
 
 [dependencies]
 ndarray = "0.17.2"
