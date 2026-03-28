@@ -1,7 +1,7 @@
 //! Error types for the Maia chess evaluation library.
 //!
 //! This crate uses `thiserror` to provide a convenient enumeration of
-//! errors that may occur while interacting with Maia2. The variants
+//! errors that may occur while interacting with Maia3. The variants
 //! wrap underlying errors from ONNX Runtime, chess parsing, and
 //! tensor operations, giving the caller a single error type to handle.
 

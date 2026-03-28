@@ -1,10 +1,10 @@
 use std::{fs, io::copy, path::Path};
 
 use maia_rust::Maia;
-use ort::session::Session;
 
-const MODEL_URL: &str = "https://raw.githubusercontent.com/CSSLab/maia-platform-frontend/e23a50e/public/maia2/maia_rapid.onnx";
-const MODEL_PATH: &str = "maia_rapid.onnx";
+const MODEL_URL: &str =
+    "https://github.com/CSSLab/maia-platform-frontend/raw/refs/heads/main/public/maia3/maia3_simplified.onnx";
+const MODEL_PATH: &str = "maia3_simplified.onnx";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Check and Download Model
@@ -23,12 +23,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut maia = Maia::from_file(MODEL_PATH)?;
 
     // 3. Define the position
-    let start_fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+    let start_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     // 4. Run Evaluation
     // We simulate a game between two 1500 Elo players
     println!("Evaluating starting position for 1500 vs 1500...");
-    let result = maia.evaluate_fen(start_fen, 1500, 1500)?;
+    let result = maia.evaluate_fen(start_fen, 1500.0, 1500.0)?;
 
     // (If you prefer batched inference, the crate also exposes
     // `batch_evaluate`, an async variant `batch_evaluate_async`, and a
@@ -36,14 +36,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // Example (synchronous):
     // let setups = vec![start_fen.parse::<shakmaty::fen::Fen>()?.into()];
-    // let batch_results = maia.batch_evaluate(setups, &[1500], &[1500])?;
+    // let batch_results = maia.batch_evaluate(setups, &[1500.0], &[1500.0])?;
 
     // 5. Output Results
     println!("------------------------------------------------");
-    println!(
-        "Win Probability (Side to move): {:.2}%",
-        result.value * 100.0
-    );
+    println!("Win Probability (Side to move): {:.2}%", result.win * 100.0);
+    println!("Draw Probability (Side to move): {:.2}%", result.draw * 100.0);
+    println!("Loss Probability (Side to move): {:.2}%", result.loss * 100.0);
     println!("------------------------------------------------");
     println!("Top 5 Predicted Moves:");
 

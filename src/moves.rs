@@ -2,11 +2,11 @@ use std::{collections::HashMap, sync::LazyLock};
 
 use shakmaty::uci::UciMove;
 
-// JSON representation of the fixed move vocabulary used by Maia2.  The
+// JSON representation of the fixed move vocabulary used by Maia3. The
 // file maps UCI strings to indices in the model's output layer.  The
 // `include_str!` macro embeds the data at compile time, avoiding an
 // extra filesystem dependency at runtime.
-const ALL_MOVES_JSON: &str = include_str!("data/all_moves.json");
+const ALL_MOVES_JSON: &str = include_str!("data/all_moves_maia3.json");
 
 /// Mapping from `UciMove` to the corresponding output index.
 ///
@@ -15,7 +15,7 @@ const ALL_MOVES_JSON: &str = include_str!("data/all_moves.json");
 /// simply linked but not used.
 pub static ALL_MOVES: LazyLock<HashMap<UciMove, usize>> = LazyLock::new(|| {
     let parsed: HashMap<String, usize> =
-        serde_json::from_str(ALL_MOVES_JSON).expect("Failed to parse all_moves.json");
+        serde_json::from_str(ALL_MOVES_JSON).expect("Failed to parse all_moves_maia3.json");
 
     parsed
         .into_iter()
