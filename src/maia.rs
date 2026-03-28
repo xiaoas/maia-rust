@@ -220,7 +220,7 @@ impl Maia {
         chess: &Chess,
         mirrored: bool,
     ) -> EvaluationResult {
-        // Convert L/D/W logits to side-to-move probabilities.
+        // Convert L/D/W logits to probabilities.
         let max_wdl = raw_wdl.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let exp_l = (raw_wdl[0] - max_wdl).exp();
         let exp_d = (raw_wdl[1] - max_wdl).exp();
@@ -230,7 +230,9 @@ impl Maia {
         let draw_prob = exp_d / sum_wdl;
         let mut win_prob = exp_w / sum_wdl;
         if mirrored {
-            // Mirroring swaps side-to-move perspective, so win/loss invert.
+            // For mirrored inputs (originally Black-to-move), the model's
+            // side-to-move W/L correspond to Black/White in the original
+            // position, so swap to get White/Black win rates.
             std::mem::swap(&mut win_prob, &mut loss_prob);
         }
 
@@ -292,9 +294,9 @@ impl Maia {
 
         EvaluationResult {
             policy,
-            win: win_prob,
+            white_wr: win_prob,
             draw: draw_prob,
-            loss: loss_prob,
+            black_wr: loss_prob,
         }
     }
 }

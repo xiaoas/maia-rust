@@ -19,10 +19,10 @@ pub struct EvaluationResult {
     /// Policy head results: legal moves sorted by descending
     /// probability.
     pub policy: Vec<MoveProbability>,
-    /// Win probability for the side to move, normalized to [0, 1].
-    pub win: f32,
-    /// Draw probability for the side to move, normalized to [0, 1].
+    /// White win rate, normalized to [0, 1].
+    pub white_wr: f32,
+    /// Draw probability, normalized to [0, 1].
     pub draw: f32,
-    /// Loss probability for the side to move, normalized to [0, 1].
-    pub loss: f32,
+    /// Black win rate, normalized to [0, 1].
+    pub black_wr: f32,
 }

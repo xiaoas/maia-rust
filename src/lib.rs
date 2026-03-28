@@ -8,8 +8,8 @@
 //!
 //! The principal type is [`Maia`], which exposes single‑position and
 //! batched evaluation methods. Results include a policy (legal moves
-//! with associated probabilities) and explicit win/draw/loss
-//! probabilities for the side to move.
+//! with associated probabilities) and explicit White/draw/Black
+//! outcome probabilities.
 //!
 //! The library re‑exports `shakmaty` to make position construction easy.
 

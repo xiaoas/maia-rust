@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut maia = Maia::from_file(MODEL_PATH)?;
 
     // 3. Define the position
-    let start_fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    let start_fen = "r1b1kb1r/ppp2ppp/2p2n2/8/3qP3/5N2/PPPP1PPP/RNBQK2R b KQkq - 2 6";
 
     // 4. Run Evaluation
     // We simulate a game between two 1500 Elo players
@@ -40,9 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Output Results
     println!("------------------------------------------------");
-    println!("Win Probability (Side to move): {:.2}%", result.win * 100.0);
-    println!("Draw Probability (Side to move): {:.2}%", result.draw * 100.0);
-    println!("Loss Probability (Side to move): {:.2}%", result.loss * 100.0);
+    println!("White Win Rate: {:.2}%", result.white_wr * 100.0);
+    println!("Draw Probability: {:.2}%", result.draw * 100.0);
+    println!("Black Win Rate: {:.2}%", result.black_wr * 100.0);
     println!("------------------------------------------------");
     println!("Top 5 Predicted Moves:");
 

@@ -11,7 +11,7 @@ for inference on Maia3 policy/value heads.
 - Evaluate single positions or batches.
 - Convert FEN strings / `shakmaty::Setup` values into Maia3 token input.
 - Use raw floating-point Elo conditioning (`elo_self`, `elo_oppo`).
-- Return legal move probabilities plus side-to-move win/draw/loss probabilities.
+- Return legal move probabilities plus White/draw/Black outcome probabilities.
 
 ## Usage
 
@@ -29,8 +29,8 @@ fn main() -> Result<(), maia_rust::Error> {
     )?;
 
     println!(
-        "policy: {:?}\nwin: {}\ndraw: {}\nloss: {}",
-        eval.policy, eval.win, eval.draw, eval.loss
+        "policy: {:?}\nwhite_wr: {}\ndraw: {}\nblack_wr: {}",
+        eval.policy, eval.white_wr, eval.draw, eval.black_wr
     );
     Ok(())
 }
