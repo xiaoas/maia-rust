@@ -74,13 +74,13 @@ fn board_to_tokens(setup: &Setup, mut tokens: ArrayViewMut2<f32>) {
         if let Some(piece) = setup.board.piece_at(sq) {
             let piece_idx = (if piece.color.is_white() { 0 } else { 6 })
                 + match piece.role {
-                Role::Pawn => 0,
-                Role::Knight => 1,
-                Role::Bishop => 2,
-                Role::Rook => 3,
-                Role::Queen => 4,
-                Role::King => 5,
-            };
+                    Role::Pawn => 0,
+                    Role::Knight => 1,
+                    Role::Bishop => 2,
+                    Role::Rook => 3,
+                    Role::Queen => 4,
+                    Role::King => 5,
+                };
 
             // Maia3 square index matches rank-major layout:
             // a1 => 0, b1 => 1, ..., h8 => 63.

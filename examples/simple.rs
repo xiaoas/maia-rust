@@ -2,11 +2,11 @@ use std::{fs, io::copy, path::Path};
 
 use maia_rust::Maia;
 
-const MODEL_URL: &str =
-    "https://github.com/CSSLab/maia-platform-frontend/raw/refs/heads/main/public/maia3/maia3_simplified.onnx";
+const MODEL_URL: &str = "https://github.com/CSSLab/maia-platform-frontend/raw/refs/heads/main/public/maia3/maia3_simplified.onnx";
 const MODEL_PATH: &str = "maia3_simplified.onnx";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ort::set_api(ort_candle::api());
     // 1. Check and Download Model
     if !Path::new(MODEL_PATH).exists() {
         println!("Model not found at '{}'.", MODEL_PATH);
